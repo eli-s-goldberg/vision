@@ -35,11 +35,12 @@ class MNIST(data.Dataset):
     training_file = 'training.pt'
     test_file = 'test.pt'
 
-    def __init__(self, root, train=True, transform=None, target_transform=None, download=False):
+    def __init__(self, root, train=True, transform=None, target_transform=None, download=False, proxy_support=False):
         self.root = os.path.expanduser(root)
         self.transform = transform
         self.target_transform = target_transform
         self.train = train  # training set or test set
+        self.proxy_support = proxy_support
 
         if download:
             self.download()
@@ -50,10 +51,9 @@ class MNIST(data.Dataset):
 
         if self.train:
             self.train_data, self.train_labels = torch.load(
-                os.path.join(self.root, self.processed_folder, self.training_file))
+                os.path.join(root, self.processed_folder, self.training_file))
         else:
-            self.test_data, self.test_labels = torch.load(
-                os.path.join(self.root, self.processed_folder, self.test_file))
+            self.test_data, self.test_labels = torch.load(os.path.join(root, self.processed_folder, self.test_file))
 
     def __getitem__(self, index):
         """
@@ -88,11 +88,12 @@ class MNIST(data.Dataset):
 
     def _check_exists(self):
         return os.path.exists(os.path.join(self.root, self.processed_folder, self.training_file)) and \
-            os.path.exists(os.path.join(self.root, self.processed_folder, self.test_file))
+               os.path.exists(os.path.join(self.root, self.processed_folder, self.test_file))
 
     def download(self):
         """Download the MNIST data if it doesn't exist in processed_folder already."""
         from six.moves import urllib
+
         import gzip
 
         if self._check_exists():
@@ -108,8 +109,15 @@ class MNIST(data.Dataset):
             else:
                 raise
 
+        urllib.request.ProxyHandler(proxies=self.proxy_support)
         for url in self.urls:
             print('Downloading ' + url)
+            authinfo = urllib.request.HTTPBasicAuthHandler()
+            proxy_support = urllib.request.ProxyHandler(self.proxy_support)
+            opener = urllib.request.build_opener(proxy_support, authinfo,
+                                                 urllib.request.CacheFTPHandler)
+            urllib.request.install_opener(opener)
+
             data = urllib.request.urlopen(url)
             filename = url.rpartition('/')[2]
             file_path = os.path.join(self.root, self.raw_folder, filename)
@@ -137,17 +145,6 @@ class MNIST(data.Dataset):
             torch.save(test_set, f)
 
         print('Done!')
-
-
-class FashionMNIST(MNIST):
-    """`Fashion MNIST <https://github.com/zalandoresearch/fashion-mnist>`_ Dataset.
-    """
-    urls = [
-        'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-images-idx3-ubyte.gz',
-        'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-labels-idx1-ubyte.gz',
-        'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-images-idx3-ubyte.gz',
-        'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-labels-idx1-ubyte.gz',
-    ]
 
 
 def get_int(b):
